@@ -62,8 +62,7 @@ async def write_text_to_file(file_name: str, text: str) -> str:
         with open(path, "w", encoding="utf-8") as f:
             f.write(text)
 
-        result_text = f"Successfully wrote to file: {path}, {text}"
-        print(result_text)
+        result_text = f"Successfully wrote to file: {path}\n{text}"
         return result_text
     except Exception as e:
         return f"Error: {str(e)}"
