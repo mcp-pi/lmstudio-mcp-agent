@@ -26,8 +26,9 @@ MCP_CHAT_PROMPT = """
     When using tools, think step by step:
     1. Understand what tools are available
     2. Decide which tool is most appropriate
-    3. Use the tool and analyze its output
-    4. Do not use the tool if it is not necessary
+    3. Check tool's parameters and make appropriate input values for parameters
+    4. Use the tool and analyze its output
+    5. Do not use the tool if it is not necessary
     """
 DEFAULT_SYSTEM_PROMPT = MCP_CHAT_PROMPT
 QUERY_THREAD_ID = str(uuid.uuid4())
