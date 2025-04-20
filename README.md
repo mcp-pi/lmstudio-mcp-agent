@@ -47,7 +47,7 @@ source .venv/bin/activate  # For Unix-like systems
 .venv\Scripts\activate     # For Windows
 
 # Install dependencies
-uv pip install -r requirements.txt
+uv sync
 ```
 
 4. Install Ollama and download model
