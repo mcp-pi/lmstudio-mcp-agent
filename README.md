@@ -86,7 +86,7 @@ You can extend LLM functionality through the MCP configuration file. You can imp
 }
 ```
 
-## Running the Application
+## Running the Application (with Ollama)
 
 Basic execution:
 ```bash
@@ -98,10 +98,42 @@ With options:
 uv run main.py --temp 0.7 --timeout 300 --show-tools
 ```
 
+## Using Google Gemini Model
+
+Ollama MCP Agent now supports Google's Gemini model as an alternative to Ollama. To use Gemini:
+
+1. Set up Google API Key
+```bash
+# Create .env file and add your Google API key
+echo "GOOGLE_API_KEY=your_google_api_key_here" > .env
+
+# Or set environment variable directly
+export GOOGLE_API_KEY=your_google_api_key_here  # For Unix-like systems
+# Or
+set GOOGLE_API_KEY=your_google_api_key_here     # For Windows
+```
+2. Run with Gemini
+```bash
+python gemini.py
+```
+
+### Gemini Run Options
+
+- `--temp`: Set temperature value (0.0 ~ 1.0, default: 0.5)
+- `--system-prompt`: Set custom system prompt
+- `--timeout`: Response generation timeout (seconds, default: 300)
+- `--show-tools`: Display tool call information
+
+### Important Notes for Gemini
+
+- Requires valid Google API key
+- Uses Gemini 1.5 Flash model by default
+- Supports all MCP tools like the Ollama version
+- Streaming responses are enabled by default
+
 ### Run Options
 
 - `--temp`: Set temperature value (0.0 ~ 1.0, default: 1.0)
-- `--no-stream`: Disable streaming
 - `--system-prompt`: Set system prompt
 - `--timeout`: Response generation timeout (seconds, default: 300)
 - `--show-tools`: Display tool call information
@@ -110,7 +142,6 @@ uv run main.py --temp 0.7 --timeout 300 --show-tools
 
 - `main.py`: Main application file
 - `mcp_manager.py`: MCP client management
-- `query_handler.py`: Query processing and streaming implementation
 - `mcp_config.json`: MCP server configuration file
 
 ## Extending MCP Tools
