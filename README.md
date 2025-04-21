@@ -47,7 +47,7 @@ source .venv/bin/activate  # For Unix-like systems
 .venv\Scripts\activate     # For Windows
 
 # Install dependencies
-uv pip install -r requirements.txt
+uv sync
 ```
 
 4. Install Ollama and download model
@@ -90,12 +90,12 @@ You can extend LLM functionality through the MCP configuration file. You can imp
 
 Basic execution:
 ```bash
-python main.py
+uv run main.py
 ```
 
 With options:
 ```bash
-python main.py --temp 0.7 --timeout 300 --show-tools
+uv run main.py --temp 0.7 --timeout 300 --show-tools
 ```
 
 ### Run Options

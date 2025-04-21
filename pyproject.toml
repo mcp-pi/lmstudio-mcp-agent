@@ -5,7 +5,9 @@ description = "LangGraph Agent with MCP Adapters"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "dotenv>=0.9.9",
     "langchain-core>=0.1.17",
+    "langchain-google-genai>=2.1.2",
     "langchain-mcp-adapters>=0.0.5",
     "langchain-ollama>=0.1.1",
     "langgraph>=0.0.15",
@@ -14,7 +16,7 @@ dependencies = [
     "mcp>=1.6.0",
     "nest-asyncio>=1.5.8",
     "pydantic>=2.11.0",
-    "typing-extensions>=4.13.0"
+    "typing-extensions>=4.13.0",
 ]
 
 [build-system]
@@ -23,3 +25,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_server"]
+
