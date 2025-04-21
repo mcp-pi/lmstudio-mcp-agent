@@ -116,7 +116,7 @@ set GOOGLE_API_KEY=your_google_api_key_here     # For Windows
 ```
 2. Run with Gemini
 ```bash
-python gemini.py
+uv run gemini.py
 ```
 
 ### Gemini Run Options
