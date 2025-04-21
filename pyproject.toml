@@ -1,5 +1,5 @@
 [project]
-name = "OllamaMCP"
+name = "ollama-mcp-agent"
 version = "0.1.0"
 description = "LangGraph Agent with MCP Adapters"
 readme = "README.md"
