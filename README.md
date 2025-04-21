@@ -2,7 +2,9 @@
 
 Ollama MCP Agent allows you to use LLM models locally on your PC for free. Using Ollama's locally installed LLM models along with MCP (Model Context Protocol) additional features, you can easily extend LLM functionality.
 
+- contains Ollama(main.py), Gemini(gemini.py) example
 - Inspired by: [Teddynote-lab's mcp agents](https://github.com/teddynote-lab/langgraph-mcp-agents), [langchain mcp adapters](https://github.com/langchain-ai/langchain-mcp-adapters)
+- Contributor: [odeothx](https://github.com/odeothx?tab=repositories)
 
 ## Key Features
 
@@ -105,7 +107,7 @@ Ollama MCP Agent now supports Google's Gemini model as an alternative to Ollama.
 1. Set up Google API Key
 ```bash
 # Create .env file and add your Google API key
-echo "GOOGLE_API_KEY=your_google_api_key_here" > .env
+echo GOOGLE_API_KEY=your_google_api_key_here > .env
 
 # Or set environment variable directly
 export GOOGLE_API_KEY=your_google_api_key_here  # For Unix-like systems
