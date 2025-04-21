@@ -53,9 +53,9 @@ DEFAULT_SYSTEM_PROMPT = (
     MCP_CHAT_PROMPT  # Using the ReAct specific prompt when tools are present
 )
 QUERY_THREAD_ID = str(uuid.uuid4())
-DEFAULT_TEMPERATURE = 0.8
+DEFAULT_TEMPERATURE = 0.9
 # astream_log is used to display the data generated during the processing process.
-USE_ASTREAM_LOG = False
+USE_ASTREAM_LOG = True
 # LLM model settings that support Tool calling
 DEEPSEEK_R1_14B_TOOL_CALLING = "MFDoom/deepseek-r1-tool-calling:14b"
 DEEPSEEK = DEEPSEEK_R1_14B_TOOL_CALLING
