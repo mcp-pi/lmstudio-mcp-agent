@@ -512,7 +512,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ollamamcp"
+name = "ollama-mcp-agent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
