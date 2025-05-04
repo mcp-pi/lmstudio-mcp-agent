@@ -29,7 +29,7 @@ MCP_CHAT_PROMPT = """
     Use the following format:
 
     Question: the input question you must answer
-    Thought: you should always think about what to do
+    Thought: you should always think about what to do.
     Action: the action to take, should be one of [{tool_names}]
     Action Input: the input to the action
     Observation: the result of the action
@@ -57,8 +57,8 @@ DEFAULT_TEMPERATURE = 0.9
 # astream_log is used to display the data generated during the processing process.
 USE_ASTREAM_LOG = True
 # LLM model settings that support Tool calling
-DEEPSEEK_R1_14B_TOOL_CALLING = "MFDoom/deepseek-r1-tool-calling:14b"
-DEEPSEEK = DEEPSEEK_R1_14B_TOOL_CALLING
+QWEN3_14B = "qwen3:14b"  # default model
+QWEN3 = QWEN3_14B
 
 
 # Signal handler for Ctrl+C on Windows
@@ -76,7 +76,7 @@ def create_chat_model(
 ) -> ChatOllama | CompiledGraph:
     # Create Chat model: Requires LLM with Tool support
     chat_model = ChatOllama(
-        model=DEEPSEEK,
+        model=QWEN3,
         temperature=temperature,
     )
 
