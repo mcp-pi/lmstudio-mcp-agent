@@ -42,12 +42,6 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 3. Create virtual environment and install dependencies
 ```bash
-# Create and activate virtual environment
-uv venv
-source .venv/bin/activate  # For Unix-like systems
-# Or
-.venv\Scripts\activate     # For Windows
-
 # Install dependencies
 uv sync
 ```
@@ -56,7 +50,7 @@ uv sync
 ```bash
 # Install Ollama (refer to https://ollama.ai for platform-specific installation)
 # Download LLM model which supports Tool calling feature
-ollama pull MFDoom/deepseek-r1-tool-calling:14b
+ollama pull qwen3:14b
 ```
 
 ## Configuration
@@ -102,7 +96,7 @@ uv run main.py --temp 0.7 --timeout 300 --show-tools
 
 ## Using Google Gemini Model
 
-Ollama MCP Agent now supports Google's Gemini model as an alternative to Ollama. To use Gemini:
+Ollama MCP Agent now supports Google's Gemini model as an alternative to Ollama. (written by: [odeothx](https://github.com/odeothx?tab=repositories)) To use Gemini:
 
 1. Set up Google API Key
 ```bash
@@ -114,6 +108,7 @@ export GOOGLE_API_KEY=your_google_api_key_here  # For Unix-like systems
 # Or
 set GOOGLE_API_KEY=your_google_api_key_here     # For Windows
 ```
+
 2. Run with Gemini
 ```bash
 uv run gemini.py
@@ -135,7 +130,7 @@ uv run gemini.py
 
 ### Run Options
 
-- `--temp`: Set temperature value (0.0 ~ 1.0, default: 1.0)
+- `--temp`: Set temperature value (0.0 ~ 1.0, default: 0.9)
 - `--system-prompt`: Set system prompt
 - `--timeout`: Response generation timeout (seconds, default: 300)
 - `--show-tools`: Display tool call information
