@@ -16,6 +16,15 @@ mcp = FastMCP(
 # Get list of files and directories in a specified path
 @mcp.tool()
 async def get_local_file_list(path: str) -> str:
+    """
+    Get a list of files and directories in a specified path.
+
+    Args:
+        path (str): local directory path to get file list
+
+    Returns:
+        str: A string containing the file list separated by newlines
+    """
     try:
         if not os.path.exists(path):
             return f"Error: Path '{path}' does not exist"
@@ -56,6 +65,16 @@ async def get_local_file_list(path: str) -> str:
 # Write specified text to a file
 @mcp.tool()
 async def write_text_to_file(file_name: str, text: str) -> str:
+    """
+    Write specified text to a file.
+
+    Args:
+        file_name (str): The name of the file to write to
+        text (str): The text to write to the file
+
+    Returns:
+        str: A string containing the weather information for the specified location
+    """
     try:
         path = os.path.join(os.path.expanduser("~"), "Downloads", file_name)
 
