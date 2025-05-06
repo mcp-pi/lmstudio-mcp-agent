@@ -130,7 +130,7 @@ uv run gemini.py
 
 ### Run Options
 
-- `--temp`: Set temperature value (0.0 ~ 1.0, default: 0.9)
+- `--temp`: Set temperature value (0.0 ~ 1.0, default: 0.1)
 - `--system-prompt`: Set system prompt
 - `--timeout`: Response generation timeout (seconds, default: 300)
 - `--show-tools`: Display tool call information
