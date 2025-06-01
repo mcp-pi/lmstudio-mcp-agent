@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import os
 import signal
 import sys
 import uuid
@@ -10,16 +11,29 @@ import nest_asyncio
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.messages.tool import ToolMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import create_react_agent
+
+# Load environment variables
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv is optional
 
 from mcp_manager import cleanup_mcp_client, initialize_mcp_client
 
 # Constants
 QUERY_TIMEOUT_SECONDS = 60 * 5
 RECURSION_LIMIT = 100
+
+# LM Studio settings
+LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1")
+LM_STUDIO_API_KEY = os.getenv("LM_STUDIO_API_KEY", "lm-studio")
+DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "local-model")
+
 MCP_CHAT_PROMPT = """
     You are a helpful AI assistant that can use tools to answer questions.
     You have access to the following tools:
@@ -47,18 +61,13 @@ MCP_CHAT_PROMPT = """
     7. If the answer is found, formulate the Final Answer. If not, decide if another tool call is needed or if you can answer based on the information gathered.
     8. Only provide the Final Answer once you are certain. Do not use a tool if it's not necessary to answer the question.
     """
-# Note: The ReAct prompt above is crucial for create_react_agent.
-# You might need to adjust it based on LLM's behavior.
 DEFAULT_SYSTEM_PROMPT = (
     MCP_CHAT_PROMPT  # Using the ReAct specific prompt when tools are present
 )
 QUERY_THREAD_ID = str(uuid.uuid4())
-DEFAULT_TEMPERATURE = 0.1
+DEFAULT_TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
 # astream_log is used to display the data generated during the processing process.
 USE_ASTREAM_LOG = True
-# LLM model settings that support Tool calling
-QWEN3_14B = "qwen3:14b"  # default model
-QWEN3 = QWEN3_14B
 
 
 # Signal handler for Ctrl+C on Windows
@@ -73,11 +82,15 @@ def create_chat_model(
     # streaming: bool = True, # Streaming is handled by LangChain methods like .astream
     system_prompt: Optional[str] = None,  # Will be used by the agent if provided
     mcp_tools: Optional[List] = None,
-) -> ChatOllama | CompiledGraph:
-    # Create Chat model: Requires LLM with Tool support
-    chat_model = ChatOllama(
-        model=QWEN3,
+    model_name: str = DEFAULT_MODEL_NAME,
+    base_url: str = LM_STUDIO_BASE_URL,
+) -> ChatOpenAI | CompiledGraph:
+    # Create Chat model: LM Studio with OpenAI-compatible API
+    chat_model = ChatOpenAI(
+        model=model_name,
         temperature=temperature,
+        base_url=base_url,
+        api_key=LM_STUDIO_API_KEY,
     )
 
     # Create ReAct agent (when MCP tools are available)
@@ -88,10 +101,10 @@ def create_chat_model(
         agent_executor = create_react_agent(
             model=chat_model, tools=mcp_tools, checkpointer=MemorySaver()
         )
-        print("ReAct agent created.")
+        print("ReAct agent created with LM Studio integration.")
         return agent_executor  # Return the agent executor graph
     else:
-        print("No MCP tools provided. Using plain Gemini model.")
+        print("No MCP tools provided. Using plain LM Studio model.")
         # If no tools, you might want a simpler system prompt
         # The default behavior without tools might just be the raw chat model.
         # Binding a default System prompt if needed:
@@ -265,10 +278,12 @@ async def amain(args):
             temperature=args.temp,
             # system_prompt=args.system_prompt, # Pass system prompt if using without tools
             mcp_tools=mcp_tools,
+            model_name=args.model,
+            base_url=args.base_url,
         )
 
         # Start chat
-        print("\n=== Starting Ollama Chat ===")
+        print("\n=== Starting LM Studio Chat ===")
         print("Enter 'quit', 'exit', or 'bye' to exit.")
         print("=" * 40 + "\n")
 
@@ -358,13 +373,25 @@ def main():
     try:
         # Parse command line arguments
         parser = argparse.ArgumentParser(
-            description="Ollama Chat CLI with MCP Tools"
+            description="LM Studio Chat CLI with MCP Tools"
         )  # Updated description
         parser.add_argument(
             "--temp",
             type=float,
             default=DEFAULT_TEMPERATURE,
             help=f"Temperature value (0.0 ~ 1.0). Default: {DEFAULT_TEMPERATURE}",
+        )
+        parser.add_argument(
+            "--model",
+            type=str,
+            default=DEFAULT_MODEL_NAME,
+            help=f"Model name to use with LM Studio. Default: {DEFAULT_MODEL_NAME}",
+        )
+        parser.add_argument(
+            "--base-url",
+            type=str,
+            default=LM_STUDIO_BASE_URL,
+            help=f"LM Studio base URL. Default: {LM_STUDIO_BASE_URL}",
         )
         # --no-stream argument might be less relevant as streaming is default/preferred
         # parser.add_argument("--no-stream", action="store_true", help="Disable streaming (May not be fully supported)")

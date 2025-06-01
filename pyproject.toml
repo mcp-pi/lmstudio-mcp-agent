@@ -1,7 +1,7 @@
 [project]
-name = "ollama-mcp-agent"
+name = "lmstudio-mcp-agent"
 version = "0.1.0"
-description = "LangGraph Agent with MCP Adapters"
+description = "LangGraph Agent with MCP Adapters and LM Studio Integration"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,7 +9,7 @@ dependencies = [
     "langchain-core>=0.1.17",
     "langchain-google-genai>=2.1.2",
     "langchain-mcp-adapters>=0.0.5",
-    "langchain-ollama>=0.1.1",
+    "langchain-openai>=0.1.0",
     "langgraph>=0.0.15",
     "langgraph-checkpoint>=2.0.23",
     "langgraph-prebuilt>=0.1.7",
