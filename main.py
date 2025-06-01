@@ -29,10 +29,26 @@ from mcp_manager import cleanup_mcp_client, initialize_mcp_client
 QUERY_TIMEOUT_SECONDS = 60 * 5
 RECURSION_LIMIT = 100
 
-# LM Studio settings
+# OpenAI API settings (prioritized if API key is available)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "gpt-4o-mini")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
+# LM Studio settings (fallback)
 LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1")
 LM_STUDIO_API_KEY = os.getenv("LM_STUDIO_API_KEY", "lm-studio")
 DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "local-model")
+
+# Determine which API to use based on availability
+USE_OPENAI = bool(
+    OPENAI_API_KEY 
+    and OPENAI_API_KEY != "your_openai_api_key_here" 
+    and OPENAI_API_KEY.startswith("sk-")
+    and len(OPENAI_API_KEY) > 20
+)
+DEFAULT_API_BASE_URL = OPENAI_BASE_URL if USE_OPENAI else LM_STUDIO_BASE_URL
+DEFAULT_API_KEY = OPENAI_API_KEY if USE_OPENAI else LM_STUDIO_API_KEY
+DEFAULT_MODEL = OPENAI_MODEL_NAME if USE_OPENAI else DEFAULT_MODEL_NAME
 
 MCP_CHAT_PROMPT = """
     You are a helpful AI assistant that can use tools to answer questions.
@@ -82,15 +98,28 @@ def create_chat_model(
     # streaming: bool = True, # Streaming is handled by LangChain methods like .astream
     system_prompt: Optional[str] = None,  # Will be used by the agent if provided
     mcp_tools: Optional[List] = None,
-    model_name: str = DEFAULT_MODEL_NAME,
-    base_url: str = LM_STUDIO_BASE_URL,
+    model_name: str = None,
+    base_url: str = None,
+    api_key: str = None,
 ) -> ChatOpenAI | CompiledGraph:
-    # Create Chat model: LM Studio with OpenAI-compatible API
+    # Use defaults based on API preference
+    if model_name is None:
+        model_name = DEFAULT_MODEL
+    if base_url is None:
+        base_url = DEFAULT_API_BASE_URL
+    if api_key is None:
+        api_key = DEFAULT_API_KEY
+    
+    # Print which API is being used
+    api_type = "OpenAI API" if USE_OPENAI else "LM Studio"
+    print(f"Using {api_type} with model: {model_name}")
+    
+    # Create Chat model: OpenAI API or LM Studio with OpenAI-compatible API
     chat_model = ChatOpenAI(
         model=model_name,
         temperature=temperature,
         base_url=base_url,
-        api_key=LM_STUDIO_API_KEY,
+        api_key=api_key,
     )
 
     # Create ReAct agent (when MCP tools are available)
@@ -101,10 +130,10 @@ def create_chat_model(
         agent_executor = create_react_agent(
             model=chat_model, tools=mcp_tools, checkpointer=MemorySaver()
         )
-        print("ReAct agent created with LM Studio integration.")
+        print(f"ReAct agent created with {api_type} integration.")
         return agent_executor  # Return the agent executor graph
     else:
-        print("No MCP tools provided. Using plain LM Studio model.")
+        print(f"No MCP tools provided. Using plain {api_type} model.")
         # If no tools, you might want a simpler system prompt
         # The default behavior without tools might just be the raw chat model.
         # Binding a default System prompt if needed:
@@ -264,6 +293,20 @@ async def amain(args):
 
     mcp_client = None
     try:
+        # Check API configuration
+        if USE_OPENAI:
+            print(f"\n=== Using OpenAI API ===")
+            print(f"Model: {OPENAI_MODEL_NAME}")
+            print(f"Base URL: {OPENAI_BASE_URL}")
+        else:
+            print(f"\n=== Using LM Studio API ===")
+            print(f"Model: {DEFAULT_MODEL_NAME}")
+            print(f"Base URL: {LM_STUDIO_BASE_URL}")
+            if not OPENAI_API_KEY:
+                print("Note: No OpenAI API key found. To use OpenAI API, set OPENAI_API_KEY in .env file")
+            else:
+                print("Note: OpenAI API key is set but appears to be placeholder. Update it in .env file to use OpenAI API")
+
         # Initialize MCP client
         print("\n=== Initializing MCP client... ===")
         mcp_client, mcp_tools = await initialize_mcp_client()
@@ -280,10 +323,13 @@ async def amain(args):
             mcp_tools=mcp_tools,
             model_name=args.model,
             base_url=args.base_url,
+            api_key=args.api_key,
         )
 
         # Start chat
-        print("\n=== Starting LM Studio Chat ===")
+        api_type = "OpenAI API" if USE_OPENAI else "LM Studio"
+        model_name = args.model or DEFAULT_MODEL
+        print(f"\n=== Starting {api_type} Chat with {model_name} ===")
         print("Enter 'quit', 'exit', or 'bye' to exit.")
         print("=" * 40 + "\n")
 
@@ -373,7 +419,7 @@ def main():
     try:
         # Parse command line arguments
         parser = argparse.ArgumentParser(
-            description="LM Studio Chat CLI with MCP Tools"
+            description="Chat CLI with OpenAI API and LM Studio support"
         )  # Updated description
         parser.add_argument(
             "--temp",
@@ -384,14 +430,20 @@ def main():
         parser.add_argument(
             "--model",
             type=str,
-            default=DEFAULT_MODEL_NAME,
-            help=f"Model name to use with LM Studio. Default: {DEFAULT_MODEL_NAME}",
+            default=None,  # Will use DEFAULT_MODEL based on API selection
+            help=f"Model name to use. Default: {DEFAULT_MODEL} ({'OpenAI' if USE_OPENAI else 'LM Studio'} API)",
         )
         parser.add_argument(
             "--base-url",
             type=str,
-            default=LM_STUDIO_BASE_URL,
-            help=f"LM Studio base URL. Default: {LM_STUDIO_BASE_URL}",
+            default=None,  # Will use DEFAULT_API_BASE_URL based on API selection
+            help=f"API base URL. Default: {DEFAULT_API_BASE_URL} ({'OpenAI' if USE_OPENAI else 'LM Studio'} API)",
+        )
+        parser.add_argument(
+            "--api-key",
+            type=str,
+            default=None,  # Will use DEFAULT_API_KEY based on API selection
+            help="API key (defaults to environment variable)",
         )
         # --no-stream argument might be less relevant as streaming is default/preferred
         # parser.add_argument("--no-stream", action="store_true", help="Disable streaming (May not be fully supported)")
