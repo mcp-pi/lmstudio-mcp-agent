@@ -1,22 +1,26 @@
 # LM Studio MCP Agent
 
-LM Studio MCP Agent allows you to use LLM models locally on your PC for free through LM Studio. Using LM Studio's locally hosted LLM models along with MCP (Model Context Protocol) additional features, you can easily extend LLM functionality.
+LM Studio MCP Agent allows you to use LLM models locally on your PC through LM Studio or via OpenAI API. Using locally hosted LLM models along with MCP (Model Context Protocol) additional features, you can easily extend LLM functionality.
 
-- contains LM Studio(main.py), Gemini(gemini.py) example
+- Supports both OpenAI API and LM Studio local models
+- Contains LM Studio(main.py), Gemini(gemini.py) example
 - Inspired by: [Teddynote-lab's mcp agents](https://github.com/teddynote-lab/langgraph-mcp-agents), [langchain mcp adapters](https://github.com/langchain-ai/langchain-mcp-adapters)
 - Contributor: [odeothx](https://github.com/odeothx?tab=repositories)
 
 ## Key Features
 
+- Support for OpenAI API (GPT-4o-mini and other models)
 - Run LLM models locally on your PC through LM Studio (no additional costs)
 - Extend LLM capabilities through MCP
 - Streaming response output
 - Tool call information monitoring
+- Automatic API selection based on configuration
 
 ## System Requirements
 
 - Python 3.12 or higher
-- [LM Studio](https://lmstudio.ai) installation and running local server
+- [LM Studio](https://lmstudio.ai) installation and running local server (for local models)
+- OpenAI API key (for OpenAI models)
 - [uv](https://github.com/astral-sh/uv) - Fast Python package installer and resolver
 - MCP server (optional)
 
@@ -55,6 +59,30 @@ uv sync
 
 ## Configuration
 
+### Environment Configuration (.env)
+
+Create a `.env` file in the project root with your API configurations:
+
+```bash
+# OpenAI Configuration (prioritized if OPENAI_API_KEY is set)
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL_NAME=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# LM Studio Configuration (fallback if OpenAI is not configured)
+LM_STUDIO_BASE_URL=http://localhost:1234/v1
+LM_STUDIO_API_KEY=lm-studio
+DEFAULT_MODEL_NAME=qwen/qwen3-1.7b
+
+# Optional settings
+TEMPERATURE=0.1
+TIMEOUT=300
+```
+
+**API Selection Logic:**
+- If `OPENAI_API_KEY` is set and valid → Uses OpenAI API
+- Otherwise → Uses LM Studio local server
+
 ### MCP Configuration (mcp_config.json)
 
 You can extend LLM functionality through the MCP configuration file. You can implement MCP servers directly in Python or add MCP servers found on [smithery.ai](https://smithery.ai/). Add settings to the `mcp_config.json` file:
@@ -82,22 +110,46 @@ You can extend LLM functionality through the MCP configuration file. You can imp
 }
 ```
 
-## Running the Application (with LM Studio)
+## Running the Application
 
-Basic execution:
+The application automatically selects between OpenAI API and LM Studio based on your `.env` configuration.
+
+### Using OpenAI API (Recommended)
+
+1. Set your OpenAI API key in `.env`:
+```bash
+OPENAI_API_KEY=your_actual_openai_api_key
+```
+
+2. Run the application:
 ```bash
 uv run main.py
 ```
 
-With options:
+### Using LM Studio (Local Models)
+
+1. Make sure LM Studio is running with a loaded model
+2. Either remove the `OPENAI_API_KEY` from `.env` or set it to placeholder value
+3. Run the application:
 ```bash
-uv run main.py --temp 0.7 --timeout 300 --show-tools --model "your-model-name" --base-url "http://localhost:1234/v1"
+uv run main.py
+```
+
+### Basic execution:
+```bash
+uv run main.py
+```
+
+### With options:
+```bash
+uv run main.py --temp 0.7 --timeout 300 --show-tools --model "gpt-4o-mini" --base-url "https://api.openai.com/v1"
 ```
 
 ### Command Line Options:
 - `--temp`: Temperature setting (0.0-1.0, default: 0.1)
-- `--model`: Model name to use with LM Studio (default: "local-model")
-- `--base-url`: LM Studio API base URL (default: "http://localhost:1234/v1")
+- `--model`: Model name to use (auto-selected based on API)
+- `--base-url`: API base URL (auto-selected based on API)
+- `--api-key`: API key (defaults to environment variable)
 - `--timeout`: Response timeout in seconds (default: 300)
 - `--show-tools`: Show tool execution information
 - `--system-prompt`: Custom system prompt

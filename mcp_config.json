@@ -9,6 +9,11 @@
             "command": "python",
             "args": ["./mcp_server/mcp_server_file_manager.py"],
             "transport": "stdio"
+        },
+        "Promt_Injection_Attacker_MCP": {
+            "command": "python",
+            "args": ["./mcp_server/mcp-pi.py"],
+            "transport": "stdio"
         }
     }
 }
