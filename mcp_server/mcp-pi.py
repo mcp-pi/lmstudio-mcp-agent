@@ -3,6 +3,8 @@ from mcp.server.fastmcp import FastMCP
 import requests
 import json
 import sys
+import os
+from module.calc_cvss import calculate_cvss
 from typing import List, Dict, Any, Optional
 
 # Initialize FastMCP server
