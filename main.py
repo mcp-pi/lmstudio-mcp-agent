@@ -3,6 +3,7 @@ import asyncio
 import os
 import signal
 import sys
+import traceback
 import uuid
 import warnings
 from typing import Any, List, Optional
@@ -282,8 +283,6 @@ async def process_query(
             "error": f"⏱️ Request exceeded timeout of {timeout} seconds. Please try again."
         }
     except Exception as e:
-        import traceback
-
         print(f"\nDebug info: {traceback.format_exc()}")
         return {"error": f"❌ An error occurred: {str(e)}"}
 
@@ -386,14 +385,11 @@ async def amain(args):
                 break
             except Exception as e:
                 print(f"\nAn unexpected error occurred in the main loop: {str(e)}")
-                import traceback
-
                 print(traceback.format_exc())  # Print detailed traceback for debugging
                 continue  # Continue the loop if possible
 
     except Exception as e:
         print(f"\n\nAn critical error occurred during setup or execution: {str(e)}")
-        import traceback
 
         print(traceback.format_exc())
         # No raise here, allow finally block to run
@@ -479,7 +475,6 @@ def main():
         print("Exiting program.")
     except Exception as e:
         print(f"\n\nAn error occurred during program execution: {str(e)}")
-        import traceback
 
         print(traceback.format_exc())
         sys.exit(1)  # Exit with error code
