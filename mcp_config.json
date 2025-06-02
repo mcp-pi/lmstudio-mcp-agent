@@ -14,6 +14,11 @@
             "command": "python",
             "args": ["./mcp_server/mcp-pi.py"],
             "transport": "stdio"
+        },
+        "Sequential_Thinking_MCP": {
+            "command": "python",
+            "args": ["./mcp_server/thinker.py"],
+            "transport": "stdio"
         }
     }
 }
