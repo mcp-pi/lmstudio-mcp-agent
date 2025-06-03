@@ -14,6 +14,11 @@
             "command": "python",
             "args": ["./mcp_server/desktop-commander.py"],
             "transport": "stdio"
+        },
+        "CVSS_Calculator_MCP": {
+            "command": "python",
+            "args": ["./mcp_server/cal_cvss.py"],
+            "transport": "stdio"
         }
     }
 }
