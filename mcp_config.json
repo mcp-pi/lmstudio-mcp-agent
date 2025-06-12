@@ -19,6 +19,11 @@
             "command": "python",
             "args": ["./mcp_server/cal_cvss.py"],
             "transport": "stdio"
+        },
+        "SELECT_PROMPT_MCP": {
+            "command": "python",
+            "args": ["./mcp_server/select_prompt.py"],
+            "transport": "stdio"
         }
     }
 }
