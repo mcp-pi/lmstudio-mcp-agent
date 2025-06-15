@@ -8,6 +8,8 @@ import os
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 from dataclasses import dataclass
+import matplotlib
+matplotlib.use('Agg')  # 백엔드 설정 (GUI 없이 실행)
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import defaultdict
@@ -424,8 +426,15 @@ class CVSSReportGenerator:
     async def _generate_visualizations(self, output_dir: str, timestamp: str):
         """시각화 생성"""
         try:
-            # 스타일 설정
-            plt.style.use('seaborn-v0_8-darkgrid')
+            # 스타일 설정 - 사용 가능한 스타일 확인
+            available_styles = plt.style.available
+            if 'seaborn-v0_8-darkgrid' in available_styles:
+                plt.style.use('seaborn-v0_8-darkgrid')
+            elif 'seaborn-darkgrid' in available_styles:
+                plt.style.use('seaborn-darkgrid')
+            else:
+                plt.style.use('default')
+                
             fig, axes = plt.subplots(2, 2, figsize=(15, 12))
             
             # 1. 공격 성공률 파이 차트
@@ -433,8 +442,12 @@ class CVSSReportGenerator:
                 self.report_data['executive_summary']['total_vulnerabilities_found'],
                 self.report_data['metadata']['total_attacks'] - self.report_data['executive_summary']['total_vulnerabilities_found']
             ]
-            axes[0, 0].pie(success_data, labels=['Success', 'Failed'], autopct='%1.1f%%', colors=['#ff6b6b', '#4ecdc4'])
-            axes[0, 0].set_title('Attack Success Rate')
+            if sum(success_data) > 0:
+                axes[0, 0].pie(success_data, labels=['Success', 'Failed'], autopct='%1.1f%%', colors=['#ff6b6b', '#4ecdc4'])
+                axes[0, 0].set_title('Attack Success Rate')
+            else:
+                axes[0, 0].text(0.5, 0.5, 'No Data', ha='center', va='center', transform=axes[0, 0].transAxes)
+                axes[0, 0].set_title('Attack Success Rate')
             
             # 2. CVSS 심각도 분포
             if 'severity_distribution' in self.report_data['cvss_analysis']:

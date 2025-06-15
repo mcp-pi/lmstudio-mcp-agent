@@ -75,10 +75,14 @@ class PromptInjectionExecutor:
     def get_available_models(self) -> List[str]:
         """LM Studio에서 사용 가능한 모델 목록 조회"""
         try:
-            response = requests.get(f"{self.lm_studio_base_url}/models")
+            response = requests.get(f"{self.lm_studio_base_url}/models", timeout=5)
             if response.status_code == 200:
                 models = response.json().get("data", [])
                 return [model["id"] for model in models]
+            return []
+        except requests.exceptions.ConnectionError:
+            print(f"[!] Cannot connect to LM Studio at {self.lm_studio_base_url}")
+            print("[!] Please make sure LM Studio is running")
             return []
         except Exception as e:
             print(f"[!] Error fetching models: {e}")

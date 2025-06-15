@@ -226,19 +226,47 @@ class AttackTemplateLibrary:
     def load_from_dataset(self, dataset_path: str):
         """외부 데이터셋에서 템플릿 로드"""
         try:
-            with open(dataset_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip():
-                        data = json.loads(line)
-                        # 데이터셋 형식에 맞춰 템플릿 생성
-                        if 'prompt' in data:
+            # JSON 파일 처리
+            if dataset_path.endswith('.json'):
+                with open(dataset_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                    # jailbreaks.json 형식 처리
+                    if isinstance(data, list):
+                        for i, item in enumerate(data):
+                            if isinstance(item, dict) and 'prompt' in item:
+                                template = AttackTemplate(
+                                    id=f"ds_json_{i}",
+                                    name=item.get('name', f'Dataset Template {i}'),
+                                    type=AttackType.JAILBREAK,
+                                    complexity=AttackComplexity.MEDIUM,
+                                    description=item.get('description', ''),
+                                    template=item['prompt'],
+                                    variations=[],
+                                    success_indicators=[],
+                                    failure_indicators=[],
+                                    cvss_metrics={"AV": "N", "AC": "L", "PR": "N", 
+                                                "UI": "N", "S": "U", "C": "L", 
+                                                "I": "L", "A": "N"}
+                                )
+                                self.add_template(template)
+                                
+            # CSV 파일 처리
+            elif dataset_path.endswith('.csv'):
+                import csv
+                with open(dataset_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for i, row in enumerate(reader):
+                        # jailbreak_prompts.csv 형식 처리
+                        prompt_text = row.get('prompt', row.get('text', ''))
+                        if prompt_text:
                             template = AttackTemplate(
-                                id=f"ds_{len(self.templates)}",
-                                name=data.get('name', 'Dataset Template'),
-                                type=AttackType.JAILBREAK,  # 기본값
+                                id=f"ds_csv_{i}",
+                                name=row.get('name', f'CSV Template {i}'),
+                                type=AttackType.JAILBREAK,
                                 complexity=AttackComplexity.MEDIUM,
-                                description=data.get('description', ''),
-                                template=data['prompt'],
+                                description=row.get('description', ''),
+                                template=prompt_text,
                                 variations=[],
                                 success_indicators=[],
                                 failure_indicators=[],
@@ -247,5 +275,31 @@ class AttackTemplateLibrary:
                                             "I": "L", "A": "N"}
                             )
                             self.add_template(template)
+                            
+            # JSONL 파일 처리
+            elif dataset_path.endswith('.jsonl'):
+                with open(dataset_path, 'r', encoding='utf-8') as f:
+                    for i, line in enumerate(f):
+                        if line.strip():
+                            data = json.loads(line)
+                            if 'prompt' in data:
+                                template = AttackTemplate(
+                                    id=f"ds_jsonl_{i}",
+                                    name=data.get('name', f'JSONL Template {i}'),
+                                    type=AttackType.JAILBREAK,
+                                    complexity=AttackComplexity.MEDIUM,
+                                    description=data.get('description', ''),
+                                    template=data['prompt'],
+                                    variations=[],
+                                    success_indicators=[],
+                                    failure_indicators=[],
+                                    cvss_metrics={"AV": "N", "AC": "L", "PR": "N", 
+                                                "UI": "N", "S": "U", "C": "L", 
+                                                "I": "L", "A": "N"}
+                                )
+                                self.add_template(template)
+                                
+            print(f"[*] Loaded {len([t for t in self.templates.values() if t.id.startswith('ds_')])} templates from dataset")
         except Exception as e:
             print(f"Error loading dataset: {e}")
+            raise

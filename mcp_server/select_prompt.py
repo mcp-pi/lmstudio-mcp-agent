@@ -23,7 +23,7 @@ def log_error(message: str):
 def log_info(message: str):
     print(f"INFO: {message}", file=sys.stderr)
 
-def select_prompt(n, filepath="dataset/results.jsonl", random=True):
+def select_prompt(n, filepath="../dataset/data/results.jsonl", random=True):
     """Original selection function: reservoir sampling or sequential extract
     - 이 함수는 MCP 툴로 감싸지기 이전의 순수 Python 함수입니다.
     - MCP 호출 내에서 사용되므로, 외부 의존성을 최소화하여 신뢰성을 확보합니다.

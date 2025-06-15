@@ -48,17 +48,38 @@ class PromptInjectionPipeline:
         
         try:
             # MCP 클라이언트 초기화
+            print("[*] Initializing MCP client...")
             self.mcp_client, self.mcp_tools = await initialize_mcp_client()
             
-            # 컴포넌트에 MCP 도구 전달
-            await self.executor.initialize_mcp_tools(self.mcp_tools)
-            await self.report_generator.initialize_cvss_tool(self.mcp_tools)
+            if not self.mcp_tools:
+                print("[!] Warning: No MCP tools available")
+                print("[!] Make sure MCP servers are properly configured and running")
+            else:
+                print(f"[*] Loaded {len(self.mcp_tools)} MCP tools")
+                
+                # 컴포넌트에 MCP 도구 전달
+                await self.executor.initialize_mcp_tools(self.mcp_tools)
+                await self.report_generator.initialize_cvss_tool(self.mcp_tools)
             
             # 데이터셋 로드 (있는 경우)
-            dataset_path = self.config.get("dataset_path", "./dataset/data/results.jsonl")
-            if os.path.exists(dataset_path):
-                print(f"[*] Loading templates from dataset: {dataset_path}")
-                self.template_library.load_from_dataset(dataset_path)
+            dataset_paths = [
+                self.config.get("dataset_path"),
+                "./dataset/data/jailbreaks.json",
+                "./dataset/data/jailbreak_prompts.csv",
+                "./dataset/data/results.jsonl"
+            ]
+            
+            for dataset_path in dataset_paths:
+                if dataset_path and os.path.exists(dataset_path):
+                    print(f"[*] Loading templates from dataset: {dataset_path}")
+                    try:
+                        self.template_library.load_from_dataset(dataset_path)
+                        break
+                    except Exception as e:
+                        print(f"[!] Warning: Failed to load dataset: {e}")
+                        continue
+            else:
+                print("[*] No dataset found, using default templates only")
             
             self.is_initialized = True
             print("[*] Pipeline initialization complete")

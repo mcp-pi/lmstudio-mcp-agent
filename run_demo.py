@@ -12,7 +12,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from attack_pipeline import PromptInjectionPipeline
-from attack_framework import AttackComplexity
+from attack_framework.attack_templates import AttackComplexity
 
 
 async def run_demo():
