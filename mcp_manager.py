@@ -22,10 +22,7 @@ def load_mcp_config() -> Dict[str, Any]:
 async def cleanup_mcp_client(client=None):
     if client is not None:
         try:
-            # Direct call instead of using shield
-            await client.__aexit__(None, None, None)
-        except asyncio.CancelledError:
-            # Ignore CancelledError during cleanup
+            # New API doesn't use context manager, so no cleanup needed
             pass
         except Exception as e:
             print(f"Error occurred while cleaning up MCP client: {str(e)}")
@@ -37,8 +34,8 @@ async def initialize_mcp_client():
 
     try:
         client = MultiServerMCPClient(mcp_config)
-        await client.__aenter__()
-        tools = client.get_tools()
+        # Use new API: get tools directly without context manager
+        tools = await client.get_tools()
         return client, tools
     except Exception as e:
         print(f"Error occurred while initializing MCP client: {str(e)}")

@@ -1,0 +1,23 @@
+# LM Studio MCP Agent Dependencies
+# Core dependencies with compatible versions
+python-dotenv>=1.0.0
+langchain-core==0.3.65
+langchain-google-genai==2.1.5
+langchain-mcp-adapters==0.1.7
+langchain-openai==0.3.14
+langgraph==0.3.31
+langgraph-checkpoint==2.0.24
+langgraph-prebuilt==0.1.8
+mcp==1.9.4
+nest-asyncio>=1.5.8
+pydantic==2.11.5
+requests>=2.25.0
+typing-extensions>=4.13.0
+
+# Additional dependencies to resolve conflicts
+langsmith==0.3.45
+google-ai-generativelanguage==0.6.18
+pydantic-settings==2.9.1
+
+# Optional: Pin numpy version to avoid conflicts
+numpy>=1.26.0,<2.0.0
