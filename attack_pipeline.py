@@ -64,8 +64,8 @@ class PromptInjectionPipeline:
             # 데이터셋 로드 (있는 경우)
             dataset_paths = [
                 self.config.get("dataset_path"),
+                "./dataset/data/jailbreak_prompts.csv",  # CSV 우선
                 "./dataset/data/jailbreaks.json",
-                "./dataset/data/jailbreak_prompts.csv",
                 "./dataset/data/results.jsonl"
             ]
             
@@ -111,7 +111,8 @@ class PromptInjectionPipeline:
         print("[*] Generating attack sequence...")
         attack_sequence = self.template_library.generate_attack_sequence(
             start_complexity=complexity_start,
-            escalate=escalate
+            escalate=escalate,
+            max_attacks=attack_count
         )
         
         # 공격 수 제한
@@ -165,6 +166,9 @@ class PromptInjectionPipeline:
         print(f"{'='*60}")
         print(f"[*] Total attacks executed: {len(results)}")
         print(f"[*] Overall success rate: {self.executor.get_success_rate():.1f}%")
+        
+        # 보고서 디렉토리 생성
+        os.makedirs("./reports", exist_ok=True)
         
         # 보고서 생성
         print("\n[*] Generating comprehensive report...")

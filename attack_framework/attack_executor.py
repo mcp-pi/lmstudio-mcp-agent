@@ -40,7 +40,22 @@ class AttackResult:
     error_message: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        """JSON 직렬화 가능한 딕셔너리로 변환"""
+        result_dict = {
+            "attack_id": self.attack_id,
+            "template_id": self.template_id,
+            "timestamp": self.timestamp,
+            "status": self.status.value,  # Enum을 문자열로 변환
+            "target_model": self.target_model,
+            "request": self.request,
+            "response": self.response,
+            "success_indicators_found": self.success_indicators_found,
+            "failure_indicators_found": self.failure_indicators_found,
+            "execution_time": self.execution_time
+        }
+        if self.error_message:
+            result_dict["error_message"] = self.error_message
+        return result_dict
 
 
 class PromptInjectionExecutor:
@@ -136,18 +151,35 @@ class PromptInjectionExecutor:
                         {"role": "user", "content": attack_payload}
                     ],
                     "temperature": 0.7,
-                    "max_tokens": 1024
-                }
+                    "max_tokens": 1024,
+                    "stream": False
+                },
+                timeout=30  # 30초 타임아웃
             )
             
             if response.status_code == 200:
                 result = response.json()
-                content = result["choices"][0]["message"]["content"]
-                execution_time = asyncio.get_event_loop().time() - start_time
-                return content, execution_time
+                if "choices" in result and len(result["choices"]) > 0:
+                    content = result["choices"][0]["message"]["content"]
+                    execution_time = asyncio.get_event_loop().time() - start_time
+                    return content, execution_time
+                else:
+                    raise Exception("Invalid response format from LM Studio")
             else:
-                raise Exception(f"API error: {response.status_code}")
+                error_msg = f"API error: {response.status_code}"
+                try:
+                    error_data = response.json()
+                    if "error" in error_data:
+                        error_msg += f" - {error_data['error']}"
+                except:
+                    pass
+                raise Exception(error_msg)
                 
+        except requests.exceptions.Timeout:
+            execution_time = asyncio.get_event_loop().time() - start_time
+            raise Exception(f"Request timeout after {execution_time:.1f} seconds")
+        except requests.exceptions.ConnectionError:
+            raise Exception("Cannot connect to LM Studio. Please ensure it's running.")
         except Exception as e:
             execution_time = asyncio.get_event_loop().time() - start_time
             raise Exception(f"Attack execution failed: {str(e)}")

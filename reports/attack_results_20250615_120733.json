@@ -1,0 +1,21 @@
+{
+  "campaign_info": {
+    "total_attacks": 4,
+    "success_rate": 50.0,
+    "timestamp": "2025-06-15T12:07:33.994337"
+  },
+  "statistics": {
+    "total_attacks": 4,
+    "successful_attacks": 2,
+    "failed_attacks": 2,
+    "average_execution_time": 1.0170469584991224,
+    "attacks_by_type": {},
+    "most_effective_template": "ri_001",
+    "least_effective_template": "jb_001"
+  },
+  "attack_results": [
+    {
+      "attack_id": "attack_20250615_120720_spb_001",
+      "template_id": "spb_001",
+      "timestamp": "2025-06-15T12:07:25.704445",
+      "status": 
