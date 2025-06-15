@@ -181,3 +181,6 @@ dataset/downloads/
 dataset/data/results.jsonl
 *.pyc
 .DS_Store
+
+# Reports (generated output)
+reports/
