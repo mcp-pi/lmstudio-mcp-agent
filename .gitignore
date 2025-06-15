@@ -175,6 +175,7 @@ cython_debug/
 
 # ETC
 .vscode
+paper.pdf
 
 # Dataset related
 dataset/downloads/

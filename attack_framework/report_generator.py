@@ -1,488 +1,587 @@
 """
-CVSS-Integrated Report Generator for Prompt Injection Vulnerability Assessment
-Generates comprehensive reports with CVSS 3.1 scoring
+공격 결과 보고서 생성
+통합 공격 결과를 JSON 및 HTML 형태로 보고서 생성
 """
 
 import json
 import os
-from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
-from dataclasses import dataclass
-import matplotlib
-matplotlib.use('Agg')  # 백엔드 설정 (GUI 없이 실행)
-import matplotlib.pyplot as plt
-import seaborn as sns
-from collections import defaultdict
+from typing import List, Dict, Any, Optional
+from pathlib import Path
 
-from .attack_templates import AttackTemplate, AttackType
-from .attack_executor import AttackResult, AttackStatus
-from .feedback_loop import AdaptiveAttackStrategy
+from .attack_executor import CombinedAttackResult, AttackStrategy
+from .attack_templates import TemplateAttackResult
+from .feedback_loop import FailureAnalysis
 
 
-@dataclass
-class CVSSScore:
-    """CVSS 점수 데이터"""
-    base_score: float
-    severity: str
-    vector_string: str
-    metrics: Dict[str, str]
-    
-    @classmethod
-    def from_metrics(cls, metrics: Dict[str, str], base_score: float) -> 'CVSSScore':
-        """메트릭으로부터 CVSS 점수 생성"""
-        severity = cls._get_severity(base_score)
-        vector_string = cls._generate_vector_string(metrics)
-        
-        return cls(
-            base_score=base_score,
-            severity=severity,
-            vector_string=vector_string,
-            metrics=metrics
-        )
-    
-    @staticmethod
-    def _get_severity(score: float) -> str:
-        """CVSS 점수에 따른 심각도 결정"""
-        if score == 0.0:
-            return "None"
-        elif 0.1 <= score <= 3.9:
-            return "Low"
-        elif 4.0 <= score <= 6.9:
-            return "Medium"
-        elif 7.0 <= score <= 8.9:
-            return "High"
-        elif 9.0 <= score <= 10.0:
-            return "Critical"
-        return "Unknown"
-    
-    @staticmethod
-    def _generate_vector_string(metrics: Dict[str, str]) -> str:
-        """CVSS 벡터 문자열 생성"""
-        vector_parts = ["CVSS:3.1"]
-        for key in ["AV", "AC", "PR", "UI", "S", "C", "I", "A"]:
-            if key in metrics:
-                vector_parts.append(f"{key}:{metrics[key]}")
-        return "/".join(vector_parts)
-
-
-class CVSSReportGenerator:
-    """CVSS 통합 보고서 생성기"""
+class ReportGenerator:
+    """공격 결과 보고서 생성기"""
     
     def __init__(self):
-        self.mcp_cvss_tool = None
-        self.report_data = {
-            "metadata": {},
-            "executive_summary": {},
-            "vulnerability_analysis": {},
-            "attack_results": [],
-            "cvss_analysis": {},
-            "recommendations": []
-        }
+        self.reports_dir = Path("./reports")
+        self.reports_dir.mkdir(exist_ok=True)
         
-    async def initialize_cvss_tool(self, mcp_tools):
-        """MCP CVSS 도구 초기화"""
-        for tool in mcp_tools:
-            if "calculate_cvss" in tool.name:
-                self.mcp_cvss_tool = tool
-                break
-                
-        if not self.mcp_cvss_tool:
-            print("[!] Warning: CVSS calculation tool not found")
-    
-    async def calculate_cvss_score(self, metrics: Dict[str, str]) -> CVSSScore:
-        """CVSS 점수 계산"""
-        if self.mcp_cvss_tool:
-            try:
-                # MCP 도구를 통한 CVSS 계산
-                result = await self.mcp_cvss_tool.ainvoke(metrics)
-                result_data = json.loads(result)
-                
-                return CVSSScore.from_metrics(
-                    metrics,
-                    result_data["cvss_score"]
-                )
-            except Exception as e:
-                print(f"[!] CVSS calculation error: {e}")
+    async def generate_full_report(self, 
+                                 result: CombinedAttackResult,
+                                 failure_analyses: List[FailureAnalysis] = None,
+                                 metadata: Dict[str, Any] = None) -> Dict[str, str]:
+        """전체 보고서 생성 (JSON + HTML)"""
         
-        # 폴백: 기본 점수
-        return CVSSScore.from_metrics(metrics, 5.0)
-    
-    async def generate_report(self,
-                            attack_results: List[AttackResult],
-                            templates_used: List[AttackTemplate],
-                            learning_summary: Dict[str, Any],
-                            target_model: str,
-                            output_dir: str = "./reports") -> str:
-        """종합 보고서 생성"""
-        
-        # 출력 디렉토리 생성
-        os.makedirs(output_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # 메타데이터 설정
-        self.report_data["metadata"] = {
-            "report_id": f"vuln_assessment_{timestamp}",
-            "generation_time": datetime.now().isoformat(),
-            "target_model": target_model,
-            "total_attacks": len(attack_results),
-            "assessment_framework": "MCP-Based LLM Prompt Injection Framework v0.1"
-        }
+        # 메타데이터 준비
+        if metadata is None:
+            metadata = {}
+            
+        report_data = self._prepare_report_data(result, failure_analyses, metadata, timestamp)
         
-        # 실행 요약 생성
-        await self._generate_executive_summary(attack_results)
-        
-        # 취약점 분석
-        await self._analyze_vulnerabilities(attack_results, templates_used)
-        
-        # CVSS 분석
-        await self._perform_cvss_analysis(attack_results, templates_used)
-        
-        # 권장사항 생성
-        self._generate_recommendations()
-        
-        # 보고서 파일 생성
-        report_path = os.path.join(output_dir, f"report_{timestamp}.json")
-        with open(report_path, 'w', encoding='utf-8') as f:
-            json.dump(self.report_data, f, indent=2, ensure_ascii=False)
+        # JSON 보고서 생성
+        json_file = await self._generate_json_report(report_data, timestamp)
         
         # HTML 보고서 생성
-        html_path = await self._generate_html_report(output_dir, timestamp)
+        html_file = await self._generate_html_report(report_data, timestamp)
         
-        # 시각화 생성
-        await self._generate_visualizations(output_dir, timestamp)
+        print(f"\n📄 보고서 생성 완료:")
+        print(f"  JSON: {json_file}")
+        print(f"  HTML: {html_file}")
         
-        print(f"[*] Report generated: {report_path}")
-        print(f"[*] HTML report: {html_path}")
-        
-        return report_path
-    
-    async def _generate_executive_summary(self, results: List[AttackResult]):
-        """실행 요약 생성"""
-        successful_attacks = [r for r in results if r.status == AttackStatus.SUCCESS]
-        
-        self.report_data["executive_summary"] = {
-            "total_vulnerabilities_found": len(successful_attacks),
-            "success_rate": (len(successful_attacks) / len(results) * 100) if results else 0,
-            "critical_findings": [],
-            "risk_level": self._determine_risk_level(successful_attacks, results)
+        return {
+            "json": json_file,
+            "html": html_file,
+            "timestamp": timestamp
         }
         
-        # 중요 발견사항 추출
-        for result in successful_attacks[:3]:  # 상위 3개
-            self.report_data["executive_summary"]["critical_findings"].append({
-                "attack_type": result.template_id,
-                "description": f"Successfully exploited with {result.template_id}",
-                "impact": "High"
-            })
-    
-    async def _analyze_vulnerabilities(self, 
-                                     results: List[AttackResult],
-                                     templates: List[AttackTemplate]):
-        """취약점 상세 분석"""
-        vulnerabilities = defaultdict(list)
+    def _prepare_report_data(self, 
+                           result: CombinedAttackResult,
+                           failure_analyses: List[FailureAnalysis],
+                           metadata: Dict[str, Any],
+                           timestamp: str) -> Dict[str, Any]:
+        """보고서 데이터 준비"""
         
-        for result in results:
-            if result.status == AttackStatus.SUCCESS:
-                # 템플릿 찾기
-                template = next((t for t in templates if t.id == result.template_id), None)
-                if template:
-                    vulnerabilities[template.type.value].append({
-                        "template_id": result.template_id,
-                        "template_name": template.name,
-                        "payload": result.request[:200] + "..." if len(result.request) > 200 else result.request,
-                        "response_preview": result.response[:200] + "..." if len(result.response) > 200 else result.response,
-                        "success_indicators": result.success_indicators_found,
-                        "execution_time": result.execution_time
-                    })
-        
-        self.report_data["vulnerability_analysis"] = dict(vulnerabilities)
-    
-    async def _perform_cvss_analysis(self,
-                                   results: List[AttackResult],
-                                   templates: List[AttackTemplate]):
-        """CVSS 점수 분석"""
-        cvss_scores = []
-        severity_distribution = defaultdict(int)
-        
-        # 성공한 공격에 대해 CVSS 점수 계산
-        for result in results:
-            if result.status == AttackStatus.SUCCESS:
-                template = next((t for t in templates if t.id == result.template_id), None)
-                if template and template.cvss_metrics:
-                    score = await self.calculate_cvss_score(template.cvss_metrics)
-                    cvss_scores.append({
-                        "attack_id": result.attack_id,
-                        "template_id": result.template_id,
-                        "cvss_score": score.base_score,
-                        "severity": score.severity,
-                        "vector_string": score.vector_string
-                    })
-                    severity_distribution[score.severity] += 1
-        
-        # 평균 CVSS 점수 계산
-        avg_cvss = sum(s["cvss_score"] for s in cvss_scores) / len(cvss_scores) if cvss_scores else 0
-        
-        self.report_data["cvss_analysis"] = {
-            "average_cvss_score": round(avg_cvss, 1),
-            "highest_cvss_score": max((s["cvss_score"] for s in cvss_scores), default=0),
-            "severity_distribution": dict(severity_distribution),
-            "detailed_scores": cvss_scores
+        # 기본 메타데이터
+        report_metadata = {
+            "timestamp": timestamp,
+            "generated_at": datetime.now().isoformat(),
+            "strategy": result.strategy.value,
+            "framework_version": "1.0.0",
+            **metadata
         }
-    
-    def _determine_risk_level(self, 
-                            successful_attacks: List[AttackResult],
-                            all_results: List[AttackResult]) -> str:
-        """전체 위험 수준 결정"""
-        if not all_results:
-            return "Unknown"
-            
-        success_rate = len(successful_attacks) / len(all_results)
         
-        if success_rate >= 0.7:
-            return "Critical"
-        elif success_rate >= 0.5:
-            return "High"
-        elif success_rate >= 0.3:
-            return "Medium"
-        elif success_rate >= 0.1:
-            return "Low"
-        else:
-            return "Minimal"
-    
-    def _generate_recommendations(self):
-        """보안 권장사항 생성"""
-        recommendations = []
+        # 전체 통계
+        overall_stats = {
+            "total_attempts": result.total_attempts,
+            "total_success": result.total_success,
+            "success_rate": result.success_rate,
+            "execution_time": result.execution_time,
+            "enhanced_attacks": result.enhanced_attacks
+        }
         
-        # CVSS 분석 기반 권장사항
-        if "cvss_analysis" in self.report_data:
-            avg_score = self.report_data["cvss_analysis"]["average_cvss_score"]
-            
-            if avg_score >= 7.0:
-                recommendations.append({
-                    "priority": "Critical",
-                    "category": "Immediate Action Required",
-                    "recommendation": "긴급한 보안 패치가 필요합니다. 프롬프트 필터링 및 입력 검증 강화를 즉시 구현하세요.",
-                    "details": [
-                        "입력 검증 레이어 추가",
-                        "프롬프트 주입 탐지 시스템 구현",
-                        "시스템 프롬프트 격리 강화"
-                    ]
-                })
-            elif avg_score >= 4.0:
-                recommendations.append({
-                    "priority": "High",
-                    "category": "Security Enhancement",
-                    "recommendation": "보안 강화가 필요합니다. 다층 방어 전략을 구현하세요.",
-                    "details": [
-                        "컨텍스트 기반 필터링 구현",
-                        "역할 기반 접근 제어 강화",
-                        "응답 검증 메커니즘 추가"
-                    ]
-                })
+        # 템플릿 공격 결과
+        template_data = {
+            "total_templates": len(result.template_results),
+            "successful_templates": sum(1 for r in result.template_results if r.success),
+            "failed_templates": sum(1 for r in result.template_results if not r.success),
+            "results": []
+        }
         
-        # 취약점 유형별 권장사항
-        vuln_analysis = self.report_data.get("vulnerability_analysis", {})
-        
-        if AttackType.SYSTEM_PROMPT_BYPASS.value in vuln_analysis:
-            recommendations.append({
-                "priority": "High",
-                "category": "System Prompt Protection",
-                "recommendation": "시스템 프롬프트 보호 강화",
-                "details": [
-                    "시스템 프롬프트와 사용자 입력 명확히 분리",
-                    "프롬프트 주입 패턴 블랙리스트 구현",
-                    "시스템 메시지 노출 방지"
-                ]
+        for template_result in result.template_results:
+            template_data["results"].append({
+                "template_id": template_result.template_id,
+                "prompt": template_result.template_prompt,
+                "response": template_result.response,
+                "success": template_result.success,
+                "indicators_found": template_result.indicators_found,
+                "execution_time": template_result.execution_time,
+                "category": template_result.category.value,
+                "cvss_score": template_result.cvss_score,
+                "enhanced_with_thinking": getattr(template_result, 'enhanced_with_thinking', False)
             })
+            
+        # LLM-to-LLM 공격 결과
+        llm_to_llm_data = {
+            "total_iterations": len(result.llm_to_llm_results),
+            "successful_iterations": sum(1 for r in result.llm_to_llm_results if r.success),
+            "results": []
+        }
         
-        if AttackType.ROLE_IMPERSONATION.value in vuln_analysis:
-            recommendations.append({
-                "priority": "Medium",
-                "category": "Identity Protection",
-                "recommendation": "역할 및 권한 관리 강화",
-                "details": [
-                    "역할 전환 시도 탐지",
-                    "권한 에스컬레이션 방지",
-                    "정체성 검증 메커니즘 구현"
-                ]
+        for llm_result in result.llm_to_llm_results:
+            llm_to_llm_data["results"].append({
+                "phase": llm_result.phase.value,
+                "prompt": llm_result.prompt,
+                "response": llm_result.response,
+                "success": llm_result.success,
+                "indicators_found": llm_result.indicators_found,
+                "execution_time": llm_result.execution_time,
+                "cvss_score": llm_result.cvss_score
             })
+            
+        # 실패 분석 데이터
+        failure_data = None
+        if failure_analyses:
+            failure_data = {
+                "total_analyzed": len(failure_analyses),
+                "analyses": []
+            }
+            
+            for analysis in failure_analyses:
+                failure_data["analyses"].append({
+                    "template_id": analysis.template_id,
+                    "failure_reason": analysis.failure_reason.value,
+                    "confidence": analysis.confidence,
+                    "evidence_keywords": analysis.evidence_keywords,
+                    "improvement_suggestions": analysis.improvement_suggestions,
+                    "recommended_approach": analysis.recommended_approach
+                })
+                
+        # CVSS 점수 분석
+        cvss_analysis = self._analyze_cvss_scores(result)
         
-        self.report_data["recommendations"] = recommendations
-    
-    async def _generate_html_report(self, output_dir: str, timestamp: str) -> str:
-        """HTML 형식 보고서 생성"""
-        html_content = f"""
-<!DOCTYPE html>
+        return {
+            "metadata": report_metadata,
+            "overall_statistics": overall_stats,
+            "template_attacks": template_data,
+            "llm_to_llm_attacks": llm_to_llm_data,
+            "failure_analysis": failure_data,
+            "cvss_analysis": cvss_analysis,
+            "summary": self._generate_summary(result, failure_analyses)
+        }
+        
+    async def _generate_json_report(self, report_data: Dict[str, Any], timestamp: str) -> str:
+        """JSON 보고서 생성"""
+        
+        filename = f"report_{timestamp}.json"
+        filepath = self.reports_dir / filename
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(report_data, f, indent=2, ensure_ascii=False)
+            
+        return str(filepath)
+        
+    async def _generate_html_report(self, report_data: Dict[str, Any], timestamp: str) -> str:
+        """HTML 보고서 생성"""
+        
+        filename = f"report_{timestamp}.html"
+        filepath = self.reports_dir / filename
+        
+        html_content = self._create_html_template(report_data)
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+            
+        return str(filepath)
+        
+    def _create_html_template(self, data: Dict[str, Any]) -> str:
+        """HTML 보고서 템플릿 생성"""
+        
+        metadata = data["metadata"]
+        stats = data["overall_statistics"]
+        template_data = data["template_attacks"]
+        llm_data = data["llm_to_llm_attacks"]
+        failure_data = data.get("failure_analysis")
+        cvss_data = data["cvss_analysis"]
+        summary = data["summary"]
+        
+        html = f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM 프롬프트 주입 취약점 평가 보고서</title>
+    <title>MCP 프롬프트 주입 공격 보고서 - {metadata['timestamp']}</title>
     <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }}
-        .container {{ max-width: 1200px; margin: 0 auto; background-color: white; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
-        h1 {{ color: #333; border-bottom: 3px solid #007bff; padding-bottom: 10px; }}
-        h2 {{ color: #555; margin-top: 30px; }}
-        .summary-box {{ background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; }}
-        .metric {{ display: inline-block; margin: 10px 20px; }}
-        .metric-value {{ font-size: 24px; font-weight: bold; color: #007bff; }}
-        .critical {{ color: #dc3545; }}
-        .high {{ color: #fd7e14; }}
-        .medium {{ color: #ffc107; }}
-        .low {{ color: #28a745; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-        th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
-        th {{ background-color: #007bff; color: white; }}
-        .recommendation {{ background-color: #e7f3ff; padding: 15px; margin: 10px 0; border-left: 4px solid #007bff; }}
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }}
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }}
+        h1, h2, h3 {{
+            color: #333;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 10px;
+        }}
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }}
+        .stat-card {{
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #007acc;
+        }}
+        .stat-value {{
+            font-size: 2em;
+            font-weight: bold;
+            color: #007acc;
+        }}
+        .stat-label {{
+            color: #666;
+            font-size: 0.9em;
+        }}
+        .success {{
+            color: #28a745;
+        }}
+        .failure {{
+            color: #dc3545;
+        }}
+        .warning {{
+            color: #ffc107;
+        }}
+        .attack-result {{
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+        }}
+        .attack-success {{
+            background: #d4edda;
+            border-left-color: #28a745;
+        }}
+        .attack-failure {{
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }}
+        .prompt-text {{
+            background: #f1f3f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }}
+        .response-text {{
+            background: #e8f4f8;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            margin: 10px 0;
+            max-height: 150px;
+            overflow-y: auto;
+        }}
+        .indicators {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin: 10px 0;
+        }}
+        .indicator {{
+            background: #007acc;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }}
+        .failure-analysis {{
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }}
+        .cvss-score {{
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+        }}
+        .cvss-low {{ background: #28a745; }}
+        .cvss-medium {{ background: #ffc107; color: black; }}
+        .cvss-high {{ background: #fd7e14; }}
+        .cvss-critical {{ background: #dc3545; }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }}
+        th, td {{
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }}
+        th {{
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }}
+        .expandable {{
+            cursor: pointer;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }}
+        .expandable:hover {{
+            background: #e9ecef;
+        }}
+        .content {{
+            display: none;
+            padding: 10px;
+            border-left: 3px solid #007acc;
+            margin-left: 20px;
+        }}
+        .content.show {{
+            display: block;
+        }}
     </style>
+    <script>
+        function toggleContent(id) {{
+            const content = document.getElementById(id);
+            content.classList.toggle('show');
+        }}
+    </script>
 </head>
 <body>
     <div class="container">
-        <h1>LLM 프롬프트 주입 취약점 평가 보고서</h1>
+        <h1>🎯 MCP 기반 프롬프트 주입 공격 보고서</h1>
         
-        <div class="summary-box">
-            <h2>실행 요약</h2>
-            <div class="metric">
-                <div>총 공격 시도</div>
-                <div class="metric-value">{self.report_data['metadata']['total_attacks']}</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{stats['total_attempts']}</div>
+                <div class="stat-label">총 공격 시도</div>
             </div>
-            <div class="metric">
-                <div>발견된 취약점</div>
-                <div class="metric-value {self._get_severity_class(self.report_data['executive_summary']['total_vulnerabilities_found'])}">{self.report_data['executive_summary']['total_vulnerabilities_found']}</div>
+            <div class="stat-card">
+                <div class="stat-value success">{stats['total_success']}</div>
+                <div class="stat-label">성공한 공격</div>
             </div>
-            <div class="metric">
-                <div>성공률</div>
-                <div class="metric-value">{self.report_data['executive_summary']['success_rate']:.1f}%</div>
+            <div class="stat-card">
+                <div class="stat-value">{stats['success_rate']:.1f}%</div>
+                <div class="stat-label">전체 성공률</div>
             </div>
-            <div class="metric">
-                <div>위험 수준</div>
-                <div class="metric-value {self._get_risk_class(self.report_data['executive_summary']['risk_level'])}">{self.report_data['executive_summary']['risk_level']}</div>
+            <div class="stat-card">
+                <div class="stat-value">{stats['execution_time']:.1f}초</div>
+                <div class="stat-label">실행 시간</div>
             </div>
         </div>
         
-        <h2>CVSS 분석</h2>
-        <div class="summary-box">
-            <div class="metric">
-                <div>평균 CVSS 점수</div>
-                <div class="metric-value">{self.report_data['cvss_analysis']['average_cvss_score']}</div>
+        <h2>📊 요약</h2>
+        <div class="prompt-text">{summary}</div>
+        
+        <h2>🎯 템플릿 기반 공격 결과</h2>
+        <p><strong>성공:</strong> <span class="success">{template_data['successful_templates']}</span> / 
+           <strong>실패:</strong> <span class="failure">{template_data['failed_templates']}</span> / 
+           <strong>전체:</strong> {template_data['total_templates']}</p>
+"""
+
+        # 템플릿 공격 결과 상세
+        for i, result in enumerate(template_data['results']):
+            status_class = "attack-success" if result['success'] else "attack-failure"
+            status_text = "✅ 성공" if result['success'] else "❌ 실패"
+            
+            # Sequential Thinking 개선 여부 표시
+            enhancement_badge = ""
+            if result.get('enhanced_with_thinking', False):
+                enhancement_badge = " <span style='background: #17a2b8; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;'>ST 개선</span>"
+            
+            cvss_class = ""
+            if result['cvss_score']:
+                if result['cvss_score'] >= 9.0:
+                    cvss_class = "cvss-critical"
+                elif result['cvss_score'] >= 7.0:
+                    cvss_class = "cvss-high"
+                elif result['cvss_score'] >= 4.0:
+                    cvss_class = "cvss-medium"
+                else:
+                    cvss_class = "cvss-low"
+            
+            html += f"""
+        <div class="attack-result {status_class}">
+            <h4>템플릿 #{result['template_id']} - {status_text}{enhancement_badge}</h4>
+            <div class="expandable" onclick="toggleContent('template_{i}')">
+                📝 프롬프트 보기 (클릭)
             </div>
-            <div class="metric">
-                <div>최고 CVSS 점수</div>
-                <div class="metric-value {self._get_cvss_class(self.report_data['cvss_analysis']['highest_cvss_score'])}">{self.report_data['cvss_analysis']['highest_cvss_score']}</div>
+            <div id="template_{i}" class="content">
+                <div class="prompt-text">{result['prompt']}</div>
+            </div>
+            
+            <div class="expandable" onclick="toggleContent('response_{i}')">
+                📄 응답 보기 (클릭)
+            </div>
+            <div id="response_{i}" class="content">
+                <div class="response-text">{result['response']}</div>
+            </div>
+            
+            {f'<div class="indicators">지표: ' + ''.join([f'<span class="indicator">{ind}</span>' for ind in result['indicators_found']]) + '</div>' if result['indicators_found'] else ''}
+            
+            <p><strong>카테고리:</strong> {result['category']} | 
+               <strong>실행시간:</strong> {result['execution_time']:.2f}초
+               {f' | <strong>CVSS:</strong> <span class="cvss-score {cvss_class}">{result["cvss_score"]:.1f}</span>' if result['cvss_score'] else ''}</p>
+        </div>
+"""
+
+        # LLM-to-LLM 공격 결과
+        if llm_data['results']:
+            html += f"""
+        <h2>🤖 LLM-to-LLM 보완 공격 결과</h2>
+        <p><strong>성공:</strong> <span class="success">{llm_data['successful_iterations']}</span> / 
+           <strong>전체:</strong> {llm_data['total_iterations']}</p>
+"""
+            
+            for i, result in enumerate(llm_data['results']):
+                status_class = "attack-success" if result['success'] else "attack-failure"
+                status_text = "✅ 성공" if result['success'] else "❌ 실패"
+                
+                html += f"""
+        <div class="attack-result {status_class}">
+            <h4>{result['phase']} 단계 - {status_text}</h4>
+            <div class="expandable" onclick="toggleContent('llm_prompt_{i}')">
+                📝 생성된 프롬프트 보기 (클릭)
+            </div>
+            <div id="llm_prompt_{i}" class="content">
+                <div class="prompt-text">{result['prompt']}</div>
+            </div>
+            
+            <div class="expandable" onclick="toggleContent('llm_response_{i}')">
+                📄 응답 보기 (클릭)
+            </div>
+            <div id="llm_response_{i}" class="content">
+                <div class="response-text">{result['response']}</div>
+            </div>
+            
+            <p><strong>실행시간:</strong> {result['execution_time']:.2f}초
+               {f' | <strong>CVSS:</strong> {result["cvss_score"]:.1f}' if result['cvss_score'] else ''}</p>
+        </div>
+"""
+
+        # 실패 분석
+        if failure_data:
+            html += f"""
+        <h2>🔍 실패 분석</h2>
+        <p>총 {failure_data['total_analyzed']}개의 실패 케이스 분석</p>
+"""
+            
+            for analysis in failure_data['analyses']:
+                html += f"""
+        <div class="failure-analysis">
+            <h4>템플릿 #{analysis['template_id']} 실패 분석</h4>
+            <p><strong>실패 원인:</strong> {analysis['failure_reason']} (신뢰도: {analysis['confidence']:.2f})</p>
+            <p><strong>증거 키워드:</strong> {', '.join(analysis['evidence_keywords'])}</p>
+            <p><strong>권장 접근법:</strong> {analysis['recommended_approach']}</p>
+            <div class="expandable" onclick="toggleContent('suggestions_{analysis["template_id"]}')">
+                💡 개선 제안 보기 (클릭)
+            </div>
+            <div id="suggestions_{analysis['template_id']}" class="content">
+                <ul>
+                    {''.join([f'<li>{suggestion}</li>' for suggestion in analysis['improvement_suggestions']])}
+                </ul>
+            </div>
+        </div>
+"""
+
+        # CVSS 분석
+        html += f"""
+        <h2>🛡️ CVSS 보안 점수 분석</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{cvss_data['average_score']:.1f}</div>
+                <div class="stat-label">평균 CVSS 점수</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{cvss_data['max_score']:.1f}</div>
+                <div class="stat-label">최고 CVSS 점수</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{cvss_data['critical_count']}</div>
+                <div class="stat-label">치명적 취약점</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{cvss_data['high_count']}</div>
+                <div class="stat-label">높은 위험도</div>
             </div>
         </div>
         
-        <h2>권장사항</h2>
-        {"".join(f'<div class="recommendation"><h3>{r["category"]}</h3><p>{r["recommendation"]}</p></div>' for r in self.report_data['recommendations'][:3])}
+        <h2>📋 메타데이터</h2>
+        <table>
+            <tr><th>항목</th><th>값</th></tr>
+            <tr><td>생성 시간</td><td>{metadata['generated_at']}</td></tr>
+            <tr><td>공격 전략</td><td>{metadata['strategy']}</td></tr>
+            <tr><td>프레임워크 버전</td><td>{metadata['framework_version']}</td></tr>
+        </table>
         
-        <p style="margin-top: 50px; text-align: center; color: #666;">
-            생성 시간: {self.report_data['metadata']['generation_time']}<br>
-            대상 모델: {self.report_data['metadata']['target_model']}
-        </p>
+        <footer style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; text-align: center;">
+            <p>MCP 기반 프롬프트 주입 공격 프레임워크 - 보안 연구 목적으로만 사용</p>
+        </footer>
     </div>
 </body>
-</html>
-"""
+</html>"""
+
+        return html
         
-        html_path = os.path.join(output_dir, f"report_{timestamp}.html")
-        with open(html_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-            
-        return html_path
-    
-    def _get_severity_class(self, count: int) -> str:
-        """심각도 CSS 클래스"""
-        if count >= 10:
-            return "critical"
-        elif count >= 5:
-            return "high"
-        elif count >= 2:
-            return "medium"
-        else:
-            return "low"
-    
-    def _get_risk_class(self, risk_level: str) -> str:
-        """위험 수준 CSS 클래스"""
-        risk_map = {
-            "Critical": "critical",
-            "High": "high",
-            "Medium": "medium",
-            "Low": "low",
-            "Minimal": "low"
-        }
-        return risk_map.get(risk_level, "")
-    
-    def _get_cvss_class(self, score: float) -> str:
-        """CVSS 점수 CSS 클래스"""
-        if score >= 9.0:
-            return "critical"
-        elif score >= 7.0:
-            return "high"
-        elif score >= 4.0:
-            return "medium"
-        else:
-            return "low"
-    
-    async def _generate_visualizations(self, output_dir: str, timestamp: str):
-        """시각화 생성"""
-        try:
-            # 스타일 설정 - 사용 가능한 스타일 확인
-            available_styles = plt.style.available
-            if 'seaborn-v0_8-darkgrid' in available_styles:
-                plt.style.use('seaborn-v0_8-darkgrid')
-            elif 'seaborn-darkgrid' in available_styles:
-                plt.style.use('seaborn-darkgrid')
-            else:
-                plt.style.use('default')
+    def _analyze_cvss_scores(self, result: CombinedAttackResult) -> Dict[str, Any]:
+        """CVSS 점수 분석"""
+        
+        all_scores = []
+        
+        # 템플릿 공격 점수 수집
+        for template_result in result.template_results:
+            if template_result.cvss_score:
+                all_scores.append(template_result.cvss_score)
                 
-            fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+        # LLM-to-LLM 공격 점수 수집
+        for llm_result in result.llm_to_llm_results:
+            if llm_result.cvss_score:
+                all_scores.append(llm_result.cvss_score)
+                
+        if not all_scores:
+            return {
+                "average_score": 0.0,
+                "max_score": 0.0,
+                "min_score": 0.0,
+                "critical_count": 0,
+                "high_count": 0,
+                "medium_count": 0,
+                "low_count": 0
+            }
             
-            # 1. 공격 성공률 파이 차트
-            success_data = [
-                self.report_data['executive_summary']['total_vulnerabilities_found'],
-                self.report_data['metadata']['total_attacks'] - self.report_data['executive_summary']['total_vulnerabilities_found']
-            ]
-            if sum(success_data) > 0:
-                axes[0, 0].pie(success_data, labels=['Success', 'Failed'], autopct='%1.1f%%', colors=['#ff6b6b', '#4ecdc4'])
-                axes[0, 0].set_title('Attack Success Rate')
-            else:
-                axes[0, 0].text(0.5, 0.5, 'No Data', ha='center', va='center', transform=axes[0, 0].transAxes)
-                axes[0, 0].set_title('Attack Success Rate')
+        return {
+            "average_score": sum(all_scores) / len(all_scores),
+            "max_score": max(all_scores),
+            "min_score": min(all_scores),
+            "critical_count": sum(1 for s in all_scores if s >= 9.0),
+            "high_count": sum(1 for s in all_scores if 7.0 <= s < 9.0),
+            "medium_count": sum(1 for s in all_scores if 4.0 <= s < 7.0),
+            "low_count": sum(1 for s in all_scores if 0.1 <= s < 4.0)
+        }
+        
+    def _generate_summary(self, result: CombinedAttackResult, failure_analyses: List[FailureAnalysis]) -> str:
+        """공격 결과 요약 생성"""
+        
+        strategy_desc = {
+            AttackStrategy.TEMPLATE_ONLY: "템플릿 기반 공격만 사용",
+            AttackStrategy.LLM_TO_LLM_ONLY: "LLM-to-LLM 공격만 사용", 
+            AttackStrategy.HYBRID: "하이브리드 공격 (템플릿 + LLM-to-LLM)"
+        }
+        
+        summary = f"""
+공격 전략: {strategy_desc.get(result.strategy, result.strategy.value)}
+
+전체 결과:
+- 총 {result.total_attempts}번의 공격 시도 중 {result.total_success}번 성공 (성공률: {result.success_rate:.1f}%)
+- 실행 시간: {result.execution_time:.1f}초
+
+단계별 결과:
+- 템플릿 공격: {len(result.template_results)}번 시도, {sum(1 for r in result.template_results if r.success)}번 성공
+- LLM-to-LLM 보완: {len(result.llm_to_llm_results)}번 시도, {sum(1 for r in result.llm_to_llm_results if r.success)}번 성공
+- 보완으로 복구된 공격: {result.enhanced_attacks}개
+"""
+
+        if failure_analyses:
+            most_common_failure = max(
+                set(a.failure_reason.value for a in failure_analyses),
+                key=lambda r: sum(1 for a in failure_analyses if a.failure_reason.value == r)
+            )
+            summary += f"\n주요 실패 원인: {most_common_failure}"
             
-            # 2. CVSS 심각도 분포
-            if 'severity_distribution' in self.report_data['cvss_analysis']:
-                severity_dist = self.report_data['cvss_analysis']['severity_distribution']
-                if severity_dist:
-                    axes[0, 1].bar(severity_dist.keys(), severity_dist.values(), color=['#28a745', '#ffc107', '#fd7e14', '#dc3545'])
-                    axes[0, 1].set_title('CVSS Severity Distribution')
-                    axes[0, 1].set_xlabel('Severity Level')
-                    axes[0, 1].set_ylabel('Count')
-            
-            # 3. 취약점 유형별 분포
-            vuln_types = list(self.report_data['vulnerability_analysis'].keys())
-            vuln_counts = [len(v) for v in self.report_data['vulnerability_analysis'].values()]
-            if vuln_types:
-                axes[1, 0].bar(range(len(vuln_types)), vuln_counts, tick_label=[t.split('_')[0] for t in vuln_types])
-                axes[1, 0].set_title('Vulnerabilities by Attack Type')
-                axes[1, 0].set_xlabel('Attack Type')
-                axes[1, 0].set_ylabel('Successful Attacks')
-                plt.setp(axes[1, 0].xaxis.get_majorticklabels(), rotation=45)
-            
-            # 4. CVSS 점수 히스토그램
-            if 'detailed_scores' in self.report_data['cvss_analysis']:
-                cvss_scores = [s['cvss_score'] for s in self.report_data['cvss_analysis']['detailed_scores']]
-                if cvss_scores:
-                    axes[1, 1].hist(cvss_scores, bins=10, color='#3498db', edgecolor='black')
-                    axes[1, 1].set_title('CVSS Score Distribution')
-                    axes[1, 1].set_xlabel('CVSS Score')
-                    axes[1, 1].set_ylabel('Frequency')
-            
-            plt.tight_layout()
-            viz_path = os.path.join(output_dir, f"visualizations_{timestamp}.png")
-            plt.savefig(viz_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            
-            print(f"[*] Visualizations saved: {viz_path}")
-            
-        except Exception as e:
-            print(f"[!] Error generating visualizations: {e}")
+        return summary.strip() 

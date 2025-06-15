@@ -5,16 +5,6 @@
             "args": ["./mcp_server/mcp-pi.py"],
             "transport": "stdio"
         },
-        "Sequential_Thinking_MCP": {
-            "command": "python",
-            "args": ["./mcp_server/thinker.py"],
-            "transport": "stdio"
-        },
-        "Desktop_Commander": {
-            "command": "python",
-            "args": ["./mcp_server/desktop-commander.py"],
-            "transport": "stdio"
-        },
         "CVSS_Calculator_MCP": {
             "command": "python",
             "args": ["./mcp_server/cal_cvss.py"],
@@ -23,6 +13,11 @@
         "SELECT_PROMPT_MCP": {
             "command": "python",
             "args": ["./mcp_server/select_prompt.py"],
+            "transport": "stdio"
+        },
+        "Sequential_Thinking_MCP": {
+            "command": "python",
+            "args": ["./mcp_server/thinker.py"],
             "transport": "stdio"
         }
     }
