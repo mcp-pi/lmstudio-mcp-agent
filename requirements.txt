@@ -21,3 +21,7 @@ pydantic-settings==2.9.1
 
 # Optional: Pin numpy version to avoid conflicts
 numpy>=1.26.0,<2.0.0
+
+# Visualization and reporting
+matplotlib>=3.7.0
+seaborn>=0.13.0
