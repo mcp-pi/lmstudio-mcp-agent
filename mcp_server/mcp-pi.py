@@ -44,35 +44,24 @@ def log_info(message: str):
     print(f"INFO: {message}", file=sys.stderr)
 
 def validate_model_availability(config):
-    """모델이 실제로 사용 가능한지 확인"""
+    """ENV 변수로 지정된 모델의 로드 상태를 확인합니다. 필요 시 JIT 로드됩니다."""
     try:
         url = f"{config['base_url']}/models"
         headers = {"Authorization": f"Bearer {config['api_key']}"}
-        
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             models = response.json().get("data", [])
-            model_ids = [model.get("id", "") for model in models]
-            
-            # 설정된 모델이 사용 가능한지 확인
-            if config["model"] in model_ids:
-                log_info(f"✓ Model '{config['model']}' is available")
-                return True, config["model"]
+            model_ids = [m.get("id", "") for m in models]
+            if config['model'] in model_ids:
+                log_info(f"✓ Model '{config['model']}' is already loaded")
             else:
-                # 모델명에 슬래시가 있으면 정확한 매칭 시도
-                for model_id in model_ids:
-                    if config["model"] in model_id or model_id in config["model"]:
-                        log_info(f"✓ Found similar model: '{model_id}' for '{config['model']}'")
-                        return True, model_id
-                
-                log_error(f"Model '{config['model']}' not found. Available: {model_ids}")
-                return False, None
+                log_info(f"Model '{config['model']}' not loaded yet; will be JIT loaded on first request")
+            return True, config['model']
         else:
-            log_error(f"Failed to fetch models: {response.status_code}")
+            log_error(f"Failed to list models: {response.status_code} - {response.text}")
             return False, None
-            
     except Exception as e:
-        log_error(f"Model validation error: {e}")
+        log_error(f"Error checking model availability: {e}")
         return False, None
 
 def get_attacker_llm_config():

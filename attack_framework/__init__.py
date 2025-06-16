@@ -1,12 +1,10 @@
-# attack_framework 모듈 초기화
-from .attack_templates import TemplateAttackEngine
-from .attack_executor import AttackExecutor
-from .feedback_loop import FeedbackAnalyzer
-from .report_generator import ReportGenerator
+# attack_framework 모듈 초기화 (통합 버전)
+from .attack_templates import AttackCategory, TemplateAttackResult
+from .unified_attack_executor import UnifiedAttackExecutor, UnifiedAttackResult
 
 __all__ = [
-    'TemplateAttackEngine',
-    'AttackExecutor', 
-    'FeedbackAnalyzer',
-    'ReportGenerator'
+    'AttackCategory',
+    'TemplateAttackResult',
+    'UnifiedAttackExecutor', 
+    'UnifiedAttackResult'
 ] 
