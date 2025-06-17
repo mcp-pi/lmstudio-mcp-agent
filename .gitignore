@@ -185,3 +185,6 @@ dataset/data/results.jsonl
 
 # Reports (generated output)
 reports/
+
+# dataset file
+data/
