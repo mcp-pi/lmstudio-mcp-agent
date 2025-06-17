@@ -70,7 +70,7 @@ def select_prompt_from_jsonl(n, filepath, random_selection=True):
 @mcp.tool()
 async def select_template_prompts(
     count: int = 5,
-    dataset_path: str = "./dataset/data/results.jsonl",
+    dataset_path: str = "./data/combined.jsonl",
     random_selection: bool = True,
     category: str = "all"
 ) -> str:
@@ -90,7 +90,7 @@ async def select_template_prompts(
         
         # 데이터셋 파일이 존재하지 않으면 combined.jsonl 시도
         if not Path(dataset_path).exists():
-            alternative_path = "./dataset/data/combined.jsonl"
+            alternative_path = "./data/combined.jsonl"
             if Path(alternative_path).exists():
                 log_info(f"Using alternative dataset: {alternative_path}")
                 dataset_path = alternative_path
@@ -218,7 +218,7 @@ async def get_dataset_info() -> str:
         데이터셋 정보 JSON 문자열
     """
     try:
-        dataset_dir = Path("./dataset/data")
+        dataset_dir = Path("./data")
         
         if not dataset_dir.exists():
             return json.dumps({
