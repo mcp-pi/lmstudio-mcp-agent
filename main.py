@@ -23,6 +23,9 @@ except ImportError:
 # MCP 관련 import
 from mcp_manager import initialize_mcp_client, cleanup_mcp_client
 
+# dataset 관련 import
+from utils.run import init_dataset
+
 # 새로운 통합 공격 프레임워크 import
 from attack_framework.unified_attack_executor import UnifiedAttackExecutor, UnifiedAttackResult
 from attack_framework.attack_templates import AttackCategory
@@ -51,6 +54,8 @@ class UnifiedAttackFramework:
         print(f"LM Studio URL: {self.lm_studio_url}")
         print("=" * 60)
         
+        init_dataset()
+
         # MCP 클라이언트 초기화
         print("\n[1] MCP 클라이언트 초기화 중...")
         try:
