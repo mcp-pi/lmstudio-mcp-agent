@@ -34,8 +34,8 @@ async def initialize_mcp_client():
 
     try:
         client = MultiServerMCPClient(mcp_config)
-        # Use new API: get tools directly without context manager
-        tools = await client.get_tools()
+        await client.__aenter__()
+        tools = client.get_tools()
         return client, tools
     except Exception as e:
         print(f"Error occurred while initializing MCP client: {str(e)}")
