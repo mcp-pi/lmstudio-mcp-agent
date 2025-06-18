@@ -19,6 +19,16 @@
             "command": "python",
             "args": ["./mcp_server/cal_cvss.py"],
             "transport": "stdio"
+        },
+        "Select_Prompt_MCP": {
+            "command": "python",
+            "args": ["./mcp_server/select_prompt.py"],
+            "transport": "stdio"
+        },
+        "Workflow_Orchestrator_MCP": {
+            "command": "python",
+            "args": ["./mcp_server/workflow-orchestrator.py"],
+            "transport": "stdio"
         }
     }
 }
